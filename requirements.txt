@@ -1,0 +1,13 @@
+numpy
+pandas
+scikit-learn
+scipy
+torch
+torchvision
+transformers
+pillow
+h5py
+nibabel
+matplotlib
+pycortex
+neuromaps

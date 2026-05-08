@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local environments
+.venv/
+venv/
+env/
+
+# Data, generated features, checkpoints, and logs
+data/
+outputs/
+checkpoints/
+logs/
+*.npz
+*.npy
+*.h5
+*.hdf5
+*.pt
+*.pth
+*.nii
+*.nii.gz
+*.mgz
+*.png
+*.jpg
+*.jpeg
+*.tif
+*.tiff
+*.svg
+*.pdf
+
