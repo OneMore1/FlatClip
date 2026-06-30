@@ -25,7 +25,20 @@ scripts/
   extract_hcp_geometry_control_siglip2.py
   summarize_hcp_geometry_controls.py
   make_hcp_siglip_frame_count_npz.py
+results/
+  paper_tables/
+    README.md
+    *.csv
 ```
+
+## Paper Table Results
+
+Lightweight table-level result summaries are provided under
+`results/paper_tables/`. These files contain anonymous CSV summaries for the
+paper's main and supplementary result tables. External baseline rows from the
+main resting-state benchmark table are intentionally excluded, while FlatClip
+rows, geometry controls, representation-scale comparisons, implementation
+ablations, NSD results, and supplementary alignment statistics are included.
 
 ## Environment
 

@@ -1,0 +1,14 @@
+manuscript_item,bundled_file,status,notes
+Main Table 1 FlatClip row,table1_flatclip_main.csv,included,Only the FlatClip row is included.
+Main Table 1 external fMRI baselines,,excluded_by_request,Brain-LM BrainMass LCM Brain-Harmony SwiFT NeuroSTORM and Omni-fMRI rows are not bundled here.
+Main Table 2 HCP SigLIP2 geometry controls,table2_hcp_geometry_controls_siglip2.csv,included,Uses same-source Real flatmap ACC/wF1/balanced ACC/macro F1 values.
+Main Table 3 representation-scale comparison,table3_representation_scale.csv,included,Includes ROI time series 4D ROI native voxel and adaptive patch rows.
+Main Table 3 HCP450 ROI-to-4D provenance,table3_hcp450_roi4d_provenance.csv,included,Adds manuscript value and diagnostic rerun summaries.
+Main Table 4 implementation ablations,table4_implementation_ablations.csv,included,Backbone feature and normalization ablations.
+Supplementary backbone/token ablation,supp_rest_backbone_token_ablation.csv,included,Matches supplementary table values.
+Supplementary frame-count ablation,supp_rest_frame_count_ablation.csv,included,10/20/40 frame results.
+Supplementary DINOv2 geometry controls,supp_hcp_geometry_controls_dinov2.csv,included,Robustness check for geometry controls.
+Supplementary NSD COCO80 within-subject table,supp_nsd_coco80_within_subject.csv,included,Includes FlatClip variants and evaluated NSD baselines.
+Supplementary image-fMRI alignment table,supp_nsd_image_fmri_alignment.csv,included,Stimulus-level alignment statistics.
+FlatClip hyperparameter/configuration table,,not_result_table,Configuration is documented in the manuscript and README rather than duplicated as a result CSV.
+Figures and image panels,,not_included,Figure images and PDFs are intentionally excluded from the anonymous lightweight bundle.

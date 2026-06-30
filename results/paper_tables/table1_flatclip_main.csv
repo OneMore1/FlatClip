@@ -1,0 +1,5 @@
+dataset,task,model,acc_mean,acc_std,wf1_mean,wf1_std,notes
+HCP,Sex classification,FlatClip,82.06,2.05,82.04,2.05,Main resting-state FlatClip setting.
+ADNI_MCI,Diagnosis,FlatClip,61.11,1.48,60.75,1.16,Main resting-state FlatClip setting.
+ADNI_AD,Diagnosis,FlatClip,75.46,2.12,75.41,2.11,Main resting-state FlatClip setting.
+PPMI,PD diagnosis,FlatClip,54.86,1.96,55.72,1.63,Main resting-state FlatClip setting.

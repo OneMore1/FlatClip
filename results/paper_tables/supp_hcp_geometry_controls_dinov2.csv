@@ -1,0 +1,6 @@
+control_input,encoder,acc_mean,acc_std,wf1_mean,wf1_std,balanced_acc_mean,balanced_acc_std,macro_f1_mean,macro_f1_std,holm_marker
+Real flatmap,DINOv2,80.37,2.55,80.33,2.53,80.08,2.47,80.15,2.53,
+Spatial block-shuffle,DINOv2,75.47,0.78,75.49,0.76,75.44,0.70,75.34,0.75,*
+Vertex-permutation,DINOv2,73.77,2.80,73.80,2.81,74.06,2.61,73.73,2.76,*
+FC heatmap,DINOv2,54.99,5.08,55.04,5.07,54.80,5.08,54.77,5.07,**
+Random image,DINOv2,49.24,1.52,49.33,1.52,49.24,1.54,49.14,1.53,**

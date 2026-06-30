@@ -1,0 +1,7 @@
+input_region,subject,width_px,height_px,notes
+Cortex,all,943,384,Whole-cortex flatmap input.
+HCP-MMP visual,all,273,264,HCP-MMP visual-cortex flatmap input.
+NSDgeneral,sub1,293,208,Subject-level NSD task-active cortex input.
+NSDgeneral,sub2,293,209,Subject-level NSD task-active cortex input.
+NSDgeneral,sub5,293,209,Subject-level NSD task-active cortex input.
+NSDgeneral,sub7,292,209,Subject-level NSD task-active cortex input.

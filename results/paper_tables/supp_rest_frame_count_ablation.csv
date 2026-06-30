@@ -1,0 +1,4 @@
+frames,hcp_acc_mean,hcp_acc_std,hcp_wf1_mean,hcp_wf1_std,adni_mci_acc_mean,adni_mci_acc_std,adni_mci_wf1_mean,adni_mci_wf1_std,adni_ad_acc_mean,adni_ad_acc_std,adni_ad_wf1_mean,adni_ad_wf1_std,ppmi_acc_mean,ppmi_acc_std,ppmi_wf1_mean,ppmi_wf1_std
+10,76.31,4.61,76.27,4.64,59.40,3.23,58.52,3.13,76.39,1.39,76.39,1.43,54.17,2.08,54.12,2.11
+20,77.83,1.92,77.79,1.86,60.68,1.48,59.90,1.77,78.24,0.80,78.29,1.26,52.43,1.59,53.39,2.27
+40,82.06,2.05,82.04,2.05,61.11,1.48,60.75,1.16,75.46,2.12,75.41,2.11,54.86,1.96,55.72,1.63

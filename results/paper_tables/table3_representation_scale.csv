@@ -1,0 +1,6 @@
+representation,resolution,hcp_sex_acc_mean,hcp_sex_acc_std,hcp_sex_wf1_mean,hcp_sex_wf1_std,ad_diagnosis_acc_mean,ad_diagnosis_acc_std,ad_diagnosis_wf1_mean,ad_diagnosis_wf1_std,notes
+ROI time series,450 ROIs,65.68,4.68,65.51,4.47,60.65,5.61,60.75,3.90,Region-level temporal representation.
+4D ROI volume,100 ROIs,78.75,4.09,78.72,4.20,70.69,5.11,69.89,7.90,ROI means mapped back into atlas-defined 4D volume.
+4D ROI volume,450 ROIs,80.47,6.44,80.42,6.46,69.10,4.49,68.15,4.20,ROI means mapped back into atlas-defined 4D volume.
+Voxel model,Native 4D volume,80.74,2.41,80.32,3.21,72.22,10.20,71.66,9.54,Native voxel input with same ViT-Small comparison family.
+Voxel model,Adaptive patches,82.81,0.57,82.88,0.55,72.99,1.03,70.76,3.16,Adaptive spatial patch allocation.

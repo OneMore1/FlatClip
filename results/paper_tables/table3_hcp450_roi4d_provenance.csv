@@ -1,0 +1,5 @@
+setting,source_type,selection_rule,tokenization_summary,acc_mean,acc_std,wf1_mean,wf1_std,auc_mean,auc_std,notes
+Manuscript Table 3 HCP450 ROI-to-4D,historical_apt_logs,best_validation_auc,APT original p4 multiscale route; effectively foreground p8-scale tokens,80.47,6.44,80.42,6.46,88.15,4.73,Matches the manuscript HCP 450 ROI-to-4D row.
+Live reproduction HCP450 ROI-to-4D,rerun_apt_logs,best_validation_auc,APT original p4 multiscale route; effectively foreground p8-scale tokens,81.15,4.15,81.09,4.33,88.57,4.29,Close rerun used as provenance check rather than replacing the manuscript row.
+Strict p8 foreground single-scale diagnostic,diagnostic_rerun,best_validation_auc,APT patch_size 8 single-scale foreground tokens only,76.47,,76.41,,86.00,,Diagnostic run; lower than the manuscript setting.
+APT p8 multiscale diagnostic,diagnostic_rerun,best_validation_auc,APT patch_size 8 multiscale route; effectively coarser foreground tokens,87.46,,87.49,,94.75,,High diagnostic result but not the manuscript Table 3 setting.

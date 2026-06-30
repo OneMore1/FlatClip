@@ -1,0 +1,7 @@
+backbone,feature,hcp_acc_mean,hcp_acc_std,hcp_wf1_mean,hcp_wf1_std,ppmi_acc_mean,ppmi_acc_std,ppmi_wf1_mean,ppmi_wf1_std,adni_mci_acc_mean,adni_mci_acc_std,adni_mci_wf1_mean,adni_mci_wf1_std,adni_ad_acc_mean,adni_ad_acc_std,adni_ad_wf1_mean,adni_ad_wf1_std
+DINOv2,One global token,79.86,0.78,79.86,0.75,51.39,3.18,51.58,2.25,60.68,2.67,60.44,1.98,75.46,4.01,75.20,3.69
+DINOv2,40 Global tokens,79.53,1.17,79.50,1.15,47.57,5.14,48.82,2.67,55.98,2.67,55.58,2.09,75.00,2.41,74.61,2.34
+ViT-B,40 Global tokens,70.00,1.13,70.02,1.15,60.00,1.36,55.45,1.72,52.76,4.57,52.19,4.71,78.11,2.56,76.84,2.71
+SigLIP2,One Global token,82.06,2.05,82.04,2.05,54.86,1.96,55.72,1.63,61.11,1.48,60.75,1.16,75.46,2.12,75.41,2.11
+SigLIP2,40 Global tokens,83.08,0.59,83.02,0.66,53.47,7.54,53.93,6.14,60.68,1.96,60.02,2.07,74.07,4.88,74.13,4.98
+SigLIP2,40 patch_mean,84.94,1.06,84.91,1.06,56.94,4.21,56.48,4.27,58.12,1.96,57.82,1.87,76.39,4.17,76.36,3.93
