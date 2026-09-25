@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-"""Extract frozen SigLIP2-NaFlex patch embeddings from NSD ROI flatmaps."""
 
 from __future__ import annotations
 
@@ -47,7 +46,7 @@ class FlatmapDataset(Dataset[tuple[Image.Image, int, str]]):
 
 
 def collate(batch):
-    images, nsd_ids, paths = zip(*batch)
+    images, nsd_ids, paths = zip(*batch, strict=True)
     return list(images), np.asarray(nsd_ids, dtype=np.int32), list(paths)
 
 
@@ -59,7 +58,9 @@ def parse_bg_color(text: str) -> tuple[int, int, int]:
 
 
 def move_to_device(inputs: dict[str, object], device: str | torch.device) -> dict[str, object]:
-    return {key: value.to(device, non_blocking=True) if torch.is_tensor(value) else value for key, value in inputs.items()}
+    return {
+        key: value.to(device, non_blocking=True) if torch.is_tensor(value) else value for key, value in inputs.items()
+    }
 
 
 def call_with_supported_kwargs(fn: object, kwargs: dict[str, object]) -> object:
@@ -83,7 +84,7 @@ def pool_patches(patch_tokens: torch.Tensor, spatial: torch.Tensor | None, outpu
         if spatial is not None:
             h, w = [int(x) for x in spatial[index].detach().cpu().tolist()]
         else:
-            h = w = int(round(patches.shape[0] ** 0.5))
+            h = w = round(patches.shape[0] ** 0.5)
         n_valid = h * w
         if n_valid > int(patches.shape[0]):
             raise ValueError(f"Patch count {patches.shape[0]} is smaller than spatial shape {(h, w)}")
@@ -128,7 +129,7 @@ def main() -> None:
     parser.add_argument(
         "--checkpoint",
         type=Path,
-        default=Path(os.environ.get("FLATCLIP_CHECKPOINT_ROOT", "checkpoints")) / "siglip2-base-patch16-naflex",
+        default=Path(os.environ.get("FLATCLIP_CHECKPOINT_ROOT", "<path>")),
     )
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--num-workers", type=int, default=8)
@@ -148,7 +149,10 @@ def main() -> None:
     args.output_file.parent.mkdir(parents=True, exist_ok=True)
 
     device = args.device if torch.cuda.is_available() else "cpu"
-    print(f"device={device} input={args.input_root} n={len(paths)} output={args.output_file}", flush=True)
+    print(
+        f"device={device} input={args.input_root} n={len(paths)} output={args.output_file}",
+        flush=True,
+    )
     processor = AutoImageProcessor.from_pretrained(args.checkpoint, local_files_only=True)
     model = AutoModel.from_pretrained(args.checkpoint, local_files_only=True).eval().to(device)
 
@@ -176,18 +180,18 @@ def main() -> None:
         )
     token_shape = tuple(int(x) for x in probe.shape[1:])
     nsd_ids = np.asarray([parse_nsd_id(path) for path in paths], dtype=np.int32)
-    source_paths = np.asarray([str(path) for path in paths], dtype=h5py.string_dtype(encoding="utf-8"))
+    source_paths = np.asarray([path.name for path in paths], dtype=h5py.string_dtype(encoding="utf-8"))
 
     tmp_file = args.output_file.with_suffix(args.output_file.suffix + ".tmp")
     if tmp_file.exists():
         tmp_file.unlink()
 
     with h5py.File(tmp_file, "w") as h5:
-        emb = h5.create_dataset("embeddings", shape=(len(paths),) + token_shape, dtype="float32")
+        emb = h5.create_dataset("embeddings", shape=(len(paths), *token_shape), dtype="float32")
         h5.create_dataset("nsd_ids", data=nsd_ids)
         h5.create_dataset("source_png", data=source_paths)
         h5.attrs["backbone"] = "siglip2_base_patch16_naflex"
-        h5.attrs["checkpoint"] = str(args.checkpoint)
+        h5.attrs["checkpoint"] = args.checkpoint.name
         h5.attrs["output_patch_grid"] = int(args.output_patch_grid)
         h5.attrs["max_num_patches"] = int(args.max_num_patches)
 
@@ -206,15 +210,18 @@ def main() -> None:
                 emb[offset : offset + arr.shape[0]] = arr
                 offset += arr.shape[0]
                 if batch_index <= 3 or batch_index % 10 == 0:
-                    print(f"[{offset}/{len(paths)}] last_nsd={int(batch_nsd_ids[-1])}", flush=True)
+                    print(
+                        f"[{offset}/{len(paths)}] last_nsd={int(batch_nsd_ids[-1])}",
+                        flush=True,
+                    )
 
     tmp_file.replace(args.output_file)
     save_manifest(
         args.output_file,
         {
-            "input_root": str(args.input_root),
-            "output_file": str(args.output_file),
-            "checkpoint": str(args.checkpoint),
+            "input_name": args.input_root.name,
+            "output_name": args.output_file.name,
+            "checkpoint": args.checkpoint.name,
             "n_images": len(paths),
             "embedding_shape": [len(paths), *token_shape],
             "dtype": "float32",

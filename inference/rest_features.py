@@ -6,9 +6,10 @@ import inspect
 import json
 import math
 import os
+import sys
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Sequence
 
 import numpy as np
 import torch
@@ -17,13 +18,16 @@ from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import functional as TF
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-DEFAULT_INPUT_ROOT = Path("outputs/flatmaps/hcp")
-DEFAULT_OUTPUT_ROOT = Path("outputs/features")
+DEFAULT_INPUT_ROOT = Path("<path>")
+DEFAULT_OUTPUT_ROOT = Path("<path>")
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
 LOADER_MODULES = {
-    "siglip2": "load_siglip2",
+    "siglip2": "inference.siglip2",
 }
 
 
@@ -118,7 +122,12 @@ def collate_batch(batch):
     return images, names
 
 
-def preprocess_image(image: Image.Image, image_size: int, mean: tuple[float, float, float], std: tuple[float, float, float]) -> torch.Tensor:
+def preprocess_image(
+    image: Image.Image,
+    image_size: int,
+    mean: tuple[float, float, float],
+    std: tuple[float, float, float],
+) -> torch.Tensor:
     width, height = image.size
     scale = min(image_size / width, image_size / height)
     new_width = max(1, round(width * scale))
@@ -159,7 +168,12 @@ def maybe_adjust_supported_resolution(pixel_values: torch.Tensor, model_or_bundl
     target_width = int(nearest.width)
     if (target_height, target_width) == (height, width):
         return pixel_values
-    return F.interpolate(pixel_values, size=(target_height, target_width), mode="bilinear", align_corners=False)
+    return F.interpolate(
+        pixel_values,
+        size=(target_height, target_width),
+        mode="bilinear",
+        align_corners=False,
+    )
 
 
 def pad_images_to_patch_multiple(
@@ -176,7 +190,10 @@ def pad_images_to_patch_multiple(
         padded = Image.new("RGB", (padded_width, padded_height), bg_color)
         padded.paste(image, (0, 0))
         padded_images.append(padded)
-        max_num_patches = max(max_num_patches, (padded_width // patch_size) * (padded_height // patch_size))
+        max_num_patches = max(
+            max_num_patches,
+            (padded_width // patch_size) * (padded_height // patch_size),
+        )
     return padded_images, max_num_patches
 
 
@@ -220,14 +237,18 @@ def batch_to_model_inputs(
 
 
 def move_model_inputs_to_device(inputs: dict[str, object], device: str) -> dict[str, object]:
-    return {key: value.to(device, non_blocking=True) if torch.is_tensor(value) else value for key, value in inputs.items()}
+    return {
+        key: value.to(device, non_blocking=True) if torch.is_tensor(value) else value for key, value in inputs.items()
+    }
 
 
 def cast_feature(array: np.ndarray, save_dtype: str) -> np.ndarray:
     return array.astype(np.float16 if save_dtype == "float16" else np.float32, copy=False)
 
 
-def compact_feature_map(feature_name: str, tensor: torch.Tensor, save_dtype: str, save_full_highdim: bool) -> dict[str, np.ndarray]:
+def compact_feature_map(
+    feature_name: str, tensor: torch.Tensor, save_dtype: str, save_full_highdim: bool
+) -> dict[str, np.ndarray]:
     array = tensor.detach().cpu().numpy()
     if array.ndim <= 2:
         return {feature_name: cast_feature(array, save_dtype)}
@@ -299,15 +320,12 @@ def extract_directory_features(
                 collected.setdefault(compact_key, []).append(compact_value)
         all_names.extend(frame_names)
 
-    payload = {
-        key: np.concatenate(value, axis=0)
-        for key, value in collected.items()
-    }
+    payload = {key: np.concatenate(value, axis=0) for key, value in collected.items()}
     payload["frame_names"] = np.asarray(all_names)
     payload["metadata"] = np.asarray(
         json.dumps(
             {
-                "source_dir": str(task.source_dir),
+                "source_name": task.source_dir.name,
                 "frame_count": len(frame_paths),
                 "model_family": model_family,
                 "variant": variant,
@@ -340,7 +358,10 @@ def main() -> int:
 
     model_or_bundle, extract_features = load_bundle(args)
     for index, task in enumerate(assigned_tasks, start=1):
-        print(f"[{index}/{len(assigned_tasks)}] {task.source_dir} -> {task.output_file}", flush=True)
+        print(
+            f"[{index}/{len(assigned_tasks)}] {task.source_dir} -> {task.output_file}",
+            flush=True,
+        )
         extract_directory_features(
             task,
             model_or_bundle,

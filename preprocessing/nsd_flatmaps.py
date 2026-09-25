@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Fast PyCortex-style PNG rendering for NSD average-surface maps.
 
-This avoids calling cortex.quickflat.make_png for every sample. Each worker
-loads the flatmap mask/cache once, then reuses the sparse vertex-to-pixel map for
-all assigned samples.
-"""
 from __future__ import annotations
 
 import argparse
@@ -13,11 +8,17 @@ import sys
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 
 import numpy as np
 from matplotlib import cm
 from PIL import Image
+
+if __package__:
+    from .npz_io import load_surface_npz
+else:
+    from npz_io import load_surface_npz
 
 
 def configure_cortex(filestore: Path):
@@ -55,28 +56,20 @@ def load_surface_mask(path: Path | None) -> tuple[np.ndarray, np.ndarray] | None
         return np.asarray(data["left"], dtype=bool), np.asarray(data["right"], dtype=bool)
 
 
-def combine_masks(*masks: tuple[np.ndarray, np.ndarray] | None) -> tuple[np.ndarray, np.ndarray] | None:
+def combine_masks(
+    *masks: tuple[np.ndarray, np.ndarray] | None,
+) -> tuple[np.ndarray, np.ndarray] | None:
     out = None
     for mask in masks:
         if mask is None:
             continue
         left, right = mask
-        if out is None:
-            out = (left.copy(), right.copy())
-        else:
-            out = (out[0] & left, out[1] & right)
+        out = (left.copy(), right.copy()) if out is None else (out[0] & left, out[1] & right)
     return out
 
 
 def load_vector(path: Path, surface_mask: tuple[np.ndarray, np.ndarray] | None) -> tuple[np.ndarray, dict[str, object]]:
-    with np.load(path, allow_pickle=True) as data:
-        left = np.asarray(data["lh"], dtype=np.float32).reshape(-1)
-        right = np.asarray(data["rh"], dtype=np.float32).reshape(-1)
-        meta = {
-            key: data[key].tolist() if hasattr(data[key], "tolist") else data[key]
-            for key in data.files
-            if key not in ("lh", "rh")
-        }
+    left, right, meta = load_surface_npz(path)
     if surface_mask is not None:
         left_mask, right_mask = surface_mask
         left = left.copy()
@@ -109,7 +102,9 @@ def symmetric_limits(vec: np.ndarray, percentile: float) -> tuple[float, float]:
     return -vmax, vmax
 
 
-def prepare_vector(vec: np.ndarray, norm_mode: str, percentile: float, zscore_clip: float) -> tuple[np.ndarray, float, float]:
+def prepare_vector(
+    vec: np.ndarray, norm_mode: str, percentile: float, zscore_clip: float
+) -> tuple[np.ndarray, float, float]:
     if norm_mode == "raw":
         vmin, vmax = symmetric_limits(vec, percentile)
         return vec, vmin, vmax
@@ -211,7 +206,15 @@ def main() -> None:
         rgba = values_to_rgba(img, args.cmap, vmin, vmax)
         rgba = crop_rgba(rgba, max(0, args.crop_pad))
         Image.fromarray(rgba, mode="RGBA").save(out_png)
-        meta.update({"norm_mode": args.norm_mode, "fast_renderer": True, "height": int(args.height), "vmin": float(vmin), "vmax": float(vmax)})
+        meta.update(
+            {
+                "norm_mode": args.norm_mode,
+                "fast_renderer": True,
+                "height": int(args.height),
+                "vmin": float(vmin),
+                "vmax": float(vmax),
+            }
+        )
         out_meta.write_text(json.dumps(meta, ensure_ascii=True), encoding="utf-8")
         print(f"[{i}/{len(assigned)}] wrote {out_png.name}", flush=True)
 

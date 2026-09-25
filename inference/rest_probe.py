@@ -14,20 +14,24 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score, roc_auc_score
+from sklearn.metrics import (
+    accuracy_score,
+    balanced_accuracy_score,
+    f1_score,
+    roc_auc_score,
+)
 from torch.utils.data import DataLoader, TensorDataset
 
-
-DEFAULT_FEATURE_BASE = Path("outputs/features")
-DEFAULT_PPMI_FEATURE_ROOT = DEFAULT_FEATURE_BASE / "ppmi" / "siglip2" / "naflex"
-DEFAULT_ADNI_FEATURE_ROOT = DEFAULT_FEATURE_BASE / "adni" / "siglip2" / "naflex"
-DEFAULT_HCP_FEATURE_ROOT = DEFAULT_FEATURE_BASE / "hcp" / "siglip2" / "naflex"
-DEFAULT_HCP_ROI_ROOT = Path("data/splits/hcp/Schaefer2018_100")
-DEFAULT_HCP_LABELS = Path("data/labels/hcp_labels.csv")
-DEFAULT_PPMI_ROI_ROOT = Path("data/splits/ppmi/100ROI")
-DEFAULT_PPMI_LABELS = Path("data/labels/ppmi_labels.csv")
-DEFAULT_ADNI_SPLITS = Path("data/splits/adni")
-DEFAULT_OUT_DIR = Path("outputs/resting_mlp")
+DEFAULT_FEATURE_BASE = Path("<path>")
+DEFAULT_PPMI_FEATURE_ROOT = Path("<path>")
+DEFAULT_ADNI_FEATURE_ROOT = Path("<path>")
+DEFAULT_HCP_FEATURE_ROOT = Path("<path>")
+DEFAULT_HCP_ROI_ROOT = Path("<path>")
+DEFAULT_HCP_LABELS = Path("<path>")
+DEFAULT_PPMI_ROI_ROOT = Path("<path>")
+DEFAULT_PPMI_LABELS = Path("<path>")
+DEFAULT_ADNI_SPLITS = Path("<path>")
+DEFAULT_OUT_DIR = Path("<path>")
 
 
 @dataclass
@@ -69,7 +73,14 @@ class MLP(nn.Module):
 
 
 class MixerBlock(nn.Module):
-    def __init__(self, n_tokens: int, dim: int, token_hidden_dim: int, channel_hidden_dim: int, dropout: float):
+    def __init__(
+        self,
+        n_tokens: int,
+        dim: int,
+        token_hidden_dim: int,
+        channel_hidden_dim: int,
+        dropout: float,
+    ):
         super().__init__()
         self.token_norm = nn.LayerNorm(dim)
         self.token_mlp = nn.Sequential(
@@ -120,7 +131,9 @@ class SequenceMLPMixer(nn.Module):
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Train downstream MLP probes on resting-state SigLIP2 NaFlex flatmap features.")
+    p = argparse.ArgumentParser(
+        description="Train downstream MLP probes on resting-state SigLIP2 NaFlex flatmap features."
+    )
     p.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     p.add_argument("--ppmi-feature-root", type=Path, default=DEFAULT_PPMI_FEATURE_ROOT)
     p.add_argument("--adni-feature-root", type=Path, default=DEFAULT_ADNI_FEATURE_ROOT)
@@ -157,7 +170,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--batch-size", type=int, default=64)
     p.add_argument("--epochs", type=int, default=250)
     p.add_argument("--patience", type=int, default=40)
-    p.add_argument("--best-metric", choices=("weighted_f1", "balanced_acc", "acc"), default="weighted_f1")
+    p.add_argument(
+        "--best-metric",
+        choices=("weighted_f1", "balanced_acc", "acc"),
+        default="weighted_f1",
+    )
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--force-cache", action="store_true")
     return p.parse_args()
@@ -263,7 +280,7 @@ def cached_feature_matrix(
         "dataset": dataset,
         "feature_mode": mode,
         "subjects": subjects,
-        "feature_dirs": [str(p) for p in feature_dirs],
+        "feature_dirs": [p.name for p in feature_dirs],
     }
     if x_path.exists() and meta_path.exists() and not force_cache:
         try:
@@ -271,8 +288,8 @@ def cached_feature_matrix(
             if meta == desired:
                 print(f"[cache] load {x_path}", flush=True)
                 return np.load(x_path)
-        except Exception:
-            pass
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            print(f"[cache] ignore invalid metadata {meta_path.name}: {error}", flush=True)
     print(f"[cache] build {dataset} {mode} n={len(subjects)}", flush=True)
     rows: list[np.ndarray] = []
     for i, feature_dir in enumerate(feature_dirs, start=1):
@@ -298,7 +315,11 @@ def ppmi_labels(path: Path) -> dict[str, int]:
     for _, row in df.iterrows():
         if pd.isna(row.get("Subject")) or pd.isna(row.get("DX_GROUP")):
             continue
-        sid = str(int(row["Subject"])) if isinstance(row["Subject"], (int, float, np.integer, np.floating)) else str(row["Subject"]).strip()
+        sid = (
+            str(int(row["Subject"]))
+            if isinstance(row["Subject"], (int, float, np.integer, np.floating))
+            else str(row["Subject"]).strip()
+        )
         labels[sid] = int(row["DX_GROUP"])
     return labels
 
@@ -331,7 +352,9 @@ def build_hcp_task(args: argparse.Namespace, feature_index: dict[str, Path]) -> 
     split_subject_lists: dict[str, list[str]] = {}
     split_labels: dict[str, np.ndarray] = {}
     for split in ("train", "val", "test"):
-        subjects = [sid for sid in hcp_split_subjects(args.hcp_roi_root, split) if sid in labels and sid in feature_index]
+        subjects = [
+            sid for sid in hcp_split_subjects(args.hcp_roi_root, split) if sid in labels and sid in feature_index
+        ]
         split_subject_lists[split] = subjects
         split_labels[split] = np.asarray([labels[sid] for sid in subjects], dtype=np.int64)
         all_subjects.extend(subjects)
@@ -342,7 +365,12 @@ def build_hcp_task(args: argparse.Namespace, feature_index: dict[str, Path]) -> 
         n = len(split_subject_lists[split])
         subjects = split_subject_lists[split]
         dirs = [feature_index[sid] for sid in subjects]
-        splits[split] = SplitData(x=x_all[offset : offset + n], y=split_labels[split], subjects=subjects, feature_dirs=dirs)
+        splits[split] = SplitData(
+            x=x_all[offset : offset + n],
+            y=split_labels[split],
+            subjects=subjects,
+            feature_dirs=dirs,
+        )
         offset += n
     return TaskData("hcp", "HCP Sex Classif.", 2, splits)
 
@@ -355,18 +383,32 @@ def build_ppmi_task(args: argparse.Namespace, feature_index: dict[str, Path]) ->
     split_subject_lists: dict[str, list[str]] = {}
     split_labels: dict[str, np.ndarray] = {}
     for split in ("train", "val", "test"):
-        subjects = [sid for sid in ppmi_split_subjects(args.ppmi_roi_root, split) if sid in labels and sid in feature_index]
+        subjects = [
+            sid for sid in ppmi_split_subjects(args.ppmi_roi_root, split) if sid in labels and sid in feature_index
+        ]
         split_subject_lists[split] = subjects
         split_labels[split] = np.asarray([labels[sid] for sid in subjects], dtype=np.int64)
         all_subjects.extend(subjects)
         all_dirs.extend([feature_index[sid] for sid in subjects])
-    x_all = cached_feature_matrix(args.out_dir, "ppmi", args.feature_mode, all_subjects, all_dirs, args.force_cache)
+    x_all = cached_feature_matrix(
+        args.out_dir,
+        "ppmi",
+        args.feature_mode,
+        all_subjects,
+        all_dirs,
+        args.force_cache,
+    )
     offset = 0
     for split in ("train", "val", "test"):
         n = len(split_subject_lists[split])
         subjects = split_subject_lists[split]
         dirs = [feature_index[sid] for sid in subjects]
-        splits[split] = SplitData(x=x_all[offset : offset + n], y=split_labels[split], subjects=subjects, feature_dirs=dirs)
+        splits[split] = SplitData(
+            x=x_all[offset : offset + n],
+            y=split_labels[split],
+            subjects=subjects,
+            feature_dirs=dirs,
+        )
         offset += n
     return TaskData("ppmi", "PPMI PD Diagnosis", 3, splits)
 
@@ -377,7 +419,13 @@ def load_adni_subjects(split_root: Path, group: str, split: str) -> list[str]:
     return [str(v).strip().removeprefix("sub-") for v in df["Subject"].tolist()]
 
 
-def build_adni_task(args: argparse.Namespace, feature_index: dict[str, Path], positive: str, name: str, display: str) -> TaskData:
+def build_adni_task(
+    args: argparse.Namespace,
+    feature_index: dict[str, Path],
+    positive: str,
+    name: str,
+    display: str,
+) -> TaskData:
     splits: dict[str, SplitData] = {}
     all_subjects: list[str] = []
     all_dirs: list[Path] = []
@@ -397,7 +445,12 @@ def build_adni_task(args: argparse.Namespace, feature_index: dict[str, Path], po
         n = len(split_subject_lists[split])
         subjects = split_subject_lists[split]
         dirs = [feature_index[sid] for sid in subjects]
-        splits[split] = SplitData(x=x_all[offset : offset + n], y=split_y[split], subjects=subjects, feature_dirs=dirs)
+        splits[split] = SplitData(
+            x=x_all[offset : offset + n],
+            y=split_y[split],
+            subjects=subjects,
+            feature_dirs=dirs,
+        )
         offset += n
     return TaskData(name, display, 2, splits)
 
@@ -424,7 +477,10 @@ def class_weights(y: np.ndarray, n_classes: int, device: str) -> torch.Tensor:
 
 
 def make_loader(x: np.ndarray, y: np.ndarray, batch_size: int, shuffle: bool) -> DataLoader:
-    ds = TensorDataset(torch.from_numpy(x.astype(np.float32, copy=False)), torch.from_numpy(y.astype(np.int64, copy=False)))
+    ds = TensorDataset(
+        torch.from_numpy(x.astype(np.float32, copy=False)),
+        torch.from_numpy(y.astype(np.int64, copy=False)),
+    )
     return DataLoader(ds, batch_size=batch_size, shuffle=shuffle, pin_memory=torch.cuda.is_available())
 
 
@@ -442,8 +498,8 @@ def compute_metrics(y_true: np.ndarray, logits: np.ndarray) -> dict[str, float]:
             out["auc"] = float(roc_auc_score(y_true, prob[:, 1]))
         else:
             out["auc_ovr_weighted"] = float(roc_auc_score(y_true, prob, multi_class="ovr", average="weighted"))
-    except Exception:
-        pass
+    except ValueError as error:
+        print(f"[metrics] AUC unavailable: {error}", flush=True)
     return out
 
 
@@ -513,7 +569,14 @@ def train_one_seed(task: TaskData, seed: int, args: argparse.Namespace) -> dict:
         val_loss, y_val, val_logits = evaluate(model, val_loader, device)
         val_metrics = compute_metrics(y_val, val_logits)
         score = float(val_metrics[args.best_metric])
-        history.append({"epoch": epoch, "train_loss": float(np.mean(train_losses)), "val_loss": val_loss, **val_metrics})
+        history.append(
+            {
+                "epoch": epoch,
+                "train_loss": float(np.mean(train_losses)),
+                "val_loss": val_loss,
+                **val_metrics,
+            }
+        )
         if score > best_score:
             best_score = score
             best_epoch = epoch
@@ -523,7 +586,8 @@ def train_one_seed(task: TaskData, seed: int, args: argparse.Namespace) -> dict:
             bad_epochs += 1
         if bad_epochs >= args.patience:
             break
-    assert best_state is not None
+    if best_state is None:
+        raise RuntimeError("Training completed without a valid checkpoint.")
     model.load_state_dict(best_state)
     train_loss, y_train, train_logits = evaluate(model, train_loader, device)
     val_loss, y_val, val_logits = evaluate(model, val_loader, device)
@@ -546,7 +610,10 @@ def summarize_runs(runs: list[dict]) -> dict[str, dict[str, float]]:
     metrics = sorted({key for run in runs for key in run["test_metrics"]})
     out: dict[str, dict[str, float]] = {}
     for metric in metrics:
-        vals = np.asarray([run["test_metrics"][metric] for run in runs if metric in run["test_metrics"]], dtype=float)
+        vals = np.asarray(
+            [run["test_metrics"][metric] for run in runs if metric in run["test_metrics"]],
+            dtype=float,
+        )
         out[metric] = {
             "mean": float(vals.mean()),
             "std": float(vals.std(ddof=1)) if len(vals) > 1 else 0.0,
@@ -561,8 +628,8 @@ def save_selected_files(path: Path, tasks: list[TaskData]) -> None:
         writer.writerow(["task", "split", "subject", "label", "feature_dir"])
         for task in tasks:
             for split, data in task.splits.items():
-                for sid, y, feature_dir in zip(data.subjects, data.y, data.feature_dirs):
-                    writer.writerow([task.name, split, sid, int(y), str(feature_dir)])
+                for sid, y, feature_dir in zip(data.subjects, data.y, data.feature_dirs, strict=True):
+                    writer.writerow([task.name, split, sid, int(y), feature_dir.name])
 
 
 def main() -> None:
@@ -596,9 +663,12 @@ def main() -> None:
         print(f"=== {task.name} {task.display_name}", flush=True)
         print(
             "split counts",
-            {split: int(len(data.y)) for split, data in task.splits.items()},
+            {split: len(data.y) for split, data in task.splits.items()},
             "class counts",
-            {split: np.bincount(data.y, minlength=task.n_classes).astype(int).tolist() for split, data in task.splits.items()},
+            {
+                split: np.bincount(data.y, minlength=task.n_classes).astype(int).tolist()
+                for split, data in task.splits.items()
+            },
             "feature_dim",
             int(task.splits["train"].x.shape[1]),
             flush=True,
@@ -614,13 +684,24 @@ def main() -> None:
                 f"acc={tm['acc']:.4f} wF1={tm['weighted_f1']:.4f} bal={tm['balanced_acc']:.4f}",
                 flush=True,
             )
-            rows.append({"task": task.name, "display_name": task.display_name, "seed": seed, "best_epoch": run["best_epoch"], **{f"test_{k}": v for k, v in tm.items()}})
+            rows.append(
+                {
+                    "task": task.name,
+                    "display_name": task.display_name,
+                    "seed": seed,
+                    "best_epoch": run["best_epoch"],
+                    **{f"test_{k}": v for k, v in tm.items()},
+                }
+            )
         summary = summarize_runs(runs)
         results[task.name] = {
             "display_name": task.display_name,
             "n_classes": task.n_classes,
-            "split_counts": {split: int(len(data.y)) for split, data in task.splits.items()},
-            "class_counts": {split: np.bincount(data.y, minlength=task.n_classes).astype(int).tolist() for split, data in task.splits.items()},
+            "split_counts": {split: len(data.y) for split, data in task.splits.items()},
+            "class_counts": {
+                split: np.bincount(data.y, minlength=task.n_classes).astype(int).tolist()
+                for split, data in task.splits.items()
+            },
             "feature_dim": int(task.splits["train"].x.shape[1]),
             "runs": runs,
             "summary": summary,
@@ -629,8 +710,11 @@ def main() -> None:
     config = {
         "feature": "resting global_zscore_clip3 SigLIP2 NaFlex 40-frame npz features",
         "feature_mode": args.feature_mode,
-        "ppmi_feature_root": str(args.ppmi_feature_root),
-        "adni_feature_root": str(args.adni_feature_root),
+        "feature_roots": {
+            "hcp": args.hcp_feature_root.name,
+            "ppmi": args.ppmi_feature_root.name,
+            "adni": args.adni_feature_root.name,
+        },
         "classifier": {
             "type": "MLP",
             "model_type": args.model_type,
@@ -650,7 +734,9 @@ def main() -> None:
         "seeds": seeds,
     }
     out = {"config": config, "results": results}
-    (args.out_dir / f"resting_siglip2_naflex_mlp_{args.feature_mode}.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
+    (args.out_dir / f"resting_siglip2_naflex_mlp_{args.feature_mode}.json").write_text(
+        json.dumps(out, indent=2), encoding="utf-8"
+    )
     pd.DataFrame(rows).to_csv(args.out_dir / f"per_run_metrics_{args.feature_mode}.csv", index=False)
 
     summary_rows = []

@@ -1,10 +1,4 @@
 #!/usr/bin/env python
-"""Render NSD fsLR32k average surfaces into ROI-only flatmap PNGs.
-
-This renderer uses the existing PyCortex flatmask/flatverts cache directly, so
-it does not need pycortex or matplotlib at runtime. It is intended for remote
-batch rendering before frozen SigLIP2 feature extraction.
-"""
 
 from __future__ import annotations
 
@@ -17,6 +11,10 @@ import numpy as np
 from PIL import Image
 from scipy import sparse
 
+if __package__:
+    from .npz_io import load_surface_npz
+else:
+    from npz_io import load_surface_npz
 
 RDBU_R = np.asarray(
     [
@@ -68,14 +66,7 @@ def load_flat_cache(cache_dir: Path):
 
 def load_vector(path: Path, roi_mask: tuple[np.ndarray, np.ndarray]) -> tuple[np.ndarray, dict[str, object]]:
     left_mask, right_mask = roi_mask
-    with np.load(path, allow_pickle=True) as data:
-        left = np.asarray(data["lh"], dtype=np.float32).reshape(-1)
-        right = np.asarray(data["rh"], dtype=np.float32).reshape(-1)
-        meta = {
-            key: data[key].tolist() if hasattr(data[key], "tolist") else data[key]
-            for key in data.files
-            if key not in ("lh", "rh")
-        }
+    left, right, meta = load_surface_npz(path)
     if left.shape != (32492,) or right.shape != (32492,):
         raise ValueError(f"{path} yielded lh={left.shape}, rh={right.shape}; expected (32492,)")
     left = left.copy()
@@ -154,7 +145,7 @@ def main() -> None:
     parser.add_argument(
         "--cache-dir",
         type=Path,
-        default=Path("filestore/NSD_fsLR32k/cache"),
+        default=Path("<path>"),
     )
     parser.add_argument("--zscore-clip", type=float, default=3.0)
     parser.add_argument("--crop-pad", type=int, default=2)
@@ -191,8 +182,8 @@ def main() -> None:
         Image.fromarray(rgba, mode="RGBA").save(out_png)
         meta.update(
             {
-                "source_npz": str(path),
-                "roi_mask": str(args.roi_mask),
+                "source_npz": path.name,
+                "roi_mask": args.roi_mask.name,
                 "norm_mode": "zscore",
                 "zscore_clip": float(args.zscore_clip),
                 "renderer": "flatcache_no_pycortex",

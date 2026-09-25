@@ -3,9 +3,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 
@@ -16,7 +21,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
-from train_nsd_subjectsplit_utils import (
+from inference.nsd_utils import (
     CKPT_DIR,
     LABEL_DIR,
     RESULTS_DIR,
@@ -28,9 +33,8 @@ from train_nsd_subjectsplit_utils import (
     set_seed,
 )
 
-
-HDF5_ROOT = Path("data/nsd_siglip2_hdf5")
-CACHE_ROOT = Path("outputs/cache/nsd_siglip2_coco80_mlp_features")
+HDF5_ROOT = Path("<path>")
+CACHE_ROOT = Path("<path>")
 
 
 def parse_args() -> argparse.Namespace:
@@ -77,6 +81,19 @@ def safe_slug(text: str) -> str:
     return slug.strip("._-") or "embedding"
 
 
+def public_config(args: argparse.Namespace) -> dict[str, object]:
+    """Serialize hyperparameters without local data, checkpoint, or output paths."""
+    hidden = {
+        "hdf5_root",
+        "cache_root",
+        "label_dir",
+        "stim_info",
+        "out",
+        "ckpt",
+    }
+    return {key: value for key, value in vars(args).items() if key not in hidden}
+
+
 def hdf5_path(hdf5_root: Path, subject: str, hdf5_template: str) -> Path:
     return hdf5_root / hdf5_template.format(subject=subject)
 
@@ -106,7 +123,7 @@ def cache_is_valid(paths: dict[str, Path]) -> bool:
         tokens = np.load(paths["tokens"], mmap_mode="r")
         patch_mean = np.load(paths["patch_mean"], mmap_mode="r")
         token_mean = np.load(paths["token_mean"], mmap_mode="r")
-    except Exception:
+    except (OSError, ValueError):
         return False
     return (
         ids.ndim == 1
@@ -128,7 +145,10 @@ def ensure_hdf5_cache(
 ) -> dict[str, Path]:
     paths = cache_paths(cache_root, subject, embedding_label)
     if not force and cache_is_valid(paths):
-        print(f"[cache] using existing {embedding_label}_siglip2/{subject}: {paths['root']}", flush=True)
+        print(
+            f"[cache] using existing {embedding_label}_siglip2/{subject}: {paths['root']}",
+            flush=True,
+        )
         return paths
 
     src = hdf5_path(hdf5_root, subject, hdf5_template)
@@ -175,7 +195,7 @@ def ensure_hdf5_cache(
             {
                 "subject": subject,
                 "source_hdf5": str(src),
-                "n": int(len(ids)),
+                "n": len(ids),
                 "token_shape": [256, 768],
                 "dtype": "float16",
                 "model": "siglip2-base-patch16-naflex",
@@ -186,7 +206,10 @@ def ensure_hdf5_cache(
         ),
         encoding="utf-8",
     )
-    print(f"[cache] saved {embedding_label}_siglip2/{subject}: {paths['root']}", flush=True)
+    print(
+        f"[cache] saved {embedding_label}_siglip2/{subject}: {paths['root']}",
+        flush=True,
+    )
     return paths
 
 
@@ -210,7 +233,12 @@ def load_feature_store(args: argparse.Namespace, subject: str) -> FeatureStore:
     ids = np.load(paths["ids"])
     x_path = paths["tokens"] if args.input_mode == "tokens256" else paths[args.one_token_source]
     x = np.load(x_path, mmap_mode="r")
-    return FeatureStore(subject=subject, ids=ids, x=x, index={int(v): i for i, v in enumerate(ids.tolist())})
+    return FeatureStore(
+        subject=subject,
+        ids=ids,
+        x=x,
+        index={int(v): i for i, v in enumerate(ids.tolist())},
+    )
 
 
 class CocoFeatureDataset(Dataset):
@@ -256,7 +284,14 @@ class MLPBlock(nn.Module):
 
 
 class MixerBlock(nn.Module):
-    def __init__(self, n_tokens: int, dim: int, token_hidden: int, channel_hidden: int, dropout: float):
+    def __init__(
+        self,
+        n_tokens: int,
+        dim: int,
+        token_hidden: int,
+        channel_hidden: int,
+        dropout: float,
+    ):
         super().__init__()
         self.token_norm = nn.LayerNorm(dim)
         self.token_mlp = MLPBlock(n_tokens, token_hidden, dropout)
@@ -346,7 +381,7 @@ def build_examples(args: argparse.Namespace):
     label_index = {int(nsd_id): idx for idx, nsd_id in enumerate(label_ids.tolist())}
 
     train_subjects = [args.test_subject] if args.regime == "within" else [s for s in SUBJECTS if s != args.test_subject]
-    needed_subjects = sorted(set(train_subjects + [args.test_subject]))
+    needed_subjects = sorted({*train_subjects, args.test_subject})
     stores = {subject: load_feature_store(args, subject) for subject in needed_subjects}
 
     def examples_for(subject: str, pool: set[int]) -> list[tuple[str, int, int]]:
@@ -369,11 +404,19 @@ def build_examples(args: argparse.Namespace):
     rng = np.random.default_rng(args.seed)
     perm = np.arange(len(train_all))
     rng.shuffle(perm)
-    n_val = max(1, int(round(len(perm) * args.val_frac))) if len(perm) > 1 else 0
+    n_val = max(1, round(len(perm) * args.val_frac)) if len(perm) > 1 else 0
     n_val = min(n_val, max(0, len(perm) - 1))
     val_examples = [train_all[int(i)] for i in perm[:n_val]]
     train_examples = [train_all[int(i)] for i in perm[n_val:]]
-    return stores, train_examples, val_examples, test_examples, label_y, label_index, train_subjects
+    return (
+        stores,
+        train_examples,
+        val_examples,
+        test_examples,
+        label_y,
+        label_index,
+        train_subjects,
+    )
 
 
 def result_tag(
@@ -381,7 +424,7 @@ def result_tag(
     regime: str,
     test_subject: str,
     seed: int,
-    one_token_source: str = "patch_mean",
+    one_token_source: str = "patch_mean",  # noqa: S107 - model token mode
     embedding_label: str = "nsd_roi",
 ) -> str:
     mode = f"one_token_{one_token_source}" if input_mode == "one_token" else input_mode
@@ -402,13 +445,39 @@ def main() -> None:
         return
 
     set_seed(args.seed)
-    stores, train_examples, val_examples, test_examples, label_y, label_index, train_subjects = build_examples(args)
+    (
+        stores,
+        train_examples,
+        val_examples,
+        test_examples,
+        label_y,
+        label_index,
+        train_subjects,
+    ) = build_examples(args)
     train_ds = CocoFeatureDataset(stores, train_examples, label_y, label_index)
     val_ds = CocoFeatureDataset(stores, val_examples, label_y, label_index)
     test_ds = CocoFeatureDataset(stores, test_examples, label_y, label_index)
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
-    val_loader = DataLoader(val_ds, batch_size=args.eval_batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
-    test_loader = DataLoader(test_ds, batch_size=args.eval_batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=args.num_workers,
+        pin_memory=True,
+    )
+    val_loader = DataLoader(
+        val_ds,
+        batch_size=args.eval_batch_size,
+        shuffle=False,
+        num_workers=args.num_workers,
+        pin_memory=True,
+    )
+    test_loader = DataLoader(
+        test_ds,
+        batch_size=args.eval_batch_size,
+        shuffle=False,
+        num_workers=args.num_workers,
+        pin_memory=True,
+    )
 
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     amp = (not args.no_amp) and device.type == "cuda"
@@ -439,7 +508,14 @@ def main() -> None:
     neg = float(len(train_y)) - pos
     pos_weight = torch.clamp(neg / torch.clamp(pos, min=1.0), min=1.0, max=50.0).to(device)
 
-    tag = result_tag(args.input_mode, args.regime, args.test_subject, args.seed, args.one_token_source, args.embedding_label)
+    tag = result_tag(
+        args.input_mode,
+        args.regime,
+        args.test_subject,
+        args.seed,
+        args.one_token_source,
+        args.embedding_label,
+    )
     out = args.out or (RESULTS_DIR / f"{tag}.json")
     ckpt = args.ckpt or (CKPT_DIR / f"{tag}.pt")
     n_params = sum(p.numel() for p in model.parameters())
@@ -476,10 +552,20 @@ def main() -> None:
             running += float(loss.item()) * b
             seen += b
             if args.log_every > 0 and step % args.log_every == 0:
-                print(f"[train] epoch={epoch} step={step}/{len(train_loader)} loss={running / max(seen, 1):.6f}", flush=True)
+                print(
+                    f"[train] epoch={epoch} step={step}/{len(train_loader)} loss={running / max(seen, 1):.6f}",
+                    flush=True,
+                )
         train_loss = running / max(seen, 1)
         val_metrics, _, _, _ = evaluate_classifier(model, val_loader, device, amp)
-        history.append({"epoch": epoch, "train_loss": train_loss, "val_metrics": val_metrics, "epoch_seconds": time.time() - epoch_start})
+        history.append(
+            {
+                "epoch": epoch,
+                "train_loss": train_loss,
+                "val_metrics": val_metrics,
+                "epoch_seconds": time.time() - epoch_start,
+            }
+        )
         print(
             f"[epoch {epoch}] train_loss={train_loss:.6f} val_mAP={val_metrics['mAP']:.4f} "
             f"val_micro_f1={val_metrics['micro_f1']:.4f} val_weighted_f1={val_metrics['weighted_f1']:.4f}",
@@ -490,7 +576,8 @@ def main() -> None:
             best_val = current
             best_state = {k: v.detach().cpu() for k, v in model.state_dict().items()}
 
-    assert best_state is not None
+    if best_state is None:
+        raise RuntimeError("Training completed without a valid checkpoint.")
     model.load_state_dict(best_state)
     test_metrics, _, _, pred_ids = evaluate_classifier(model, test_loader, device, amp)
     payload = {
@@ -502,11 +589,11 @@ def main() -> None:
         "regime": args.regime,
         "test_subject": args.test_subject,
         "train_subjects": train_subjects,
-        "config": vars(args),
+        "config": public_config(args),
         "params": int(n_params),
-        "n_train": int(len(train_ds)),
-        "n_val": int(len(val_ds)),
-        "n_test_shared1000": int(len(test_ds)),
+        "n_train": len(train_ds),
+        "n_val": len(val_ds),
+        "n_test_shared1000": len(test_ds),
         "best_val_metric": float(best_val),
         "history": history,
         "test_metrics": test_metrics,

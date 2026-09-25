@@ -1,15 +1,5 @@
 #!/usr/bin/env python3
-"""
-Render HCP-style CIFTI-2 dense timeseries (*.dtseries.nii) to PyCortex quickflat PNGs.
 
-Expects standard HCP grayordinate layout (e.g. MSMAll Atlas): columns include
-CORTEX_LEFT / CORTEX_RIGHT with per-column vertex indices into 32k_fs_LR.
-
-Maps dense cortical columns onto full per-hemisphere vertex arrays (default 32492),
-then concatenates [L; R] like render_hcp_func_gii_pycortex.py for subject HCP_S1200_32k.
-
-Requires filestore from setup_hcp_s1200_pycortex_subject.py (32k MSMALL topology).
-"""
 from __future__ import annotations
 
 import argparse
@@ -21,8 +11,8 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-import numpy as np
 import nibabel as nib
+import numpy as np
 from PIL import Image
 
 
@@ -40,7 +30,7 @@ def _find_brain_model_axis(img: nib.Cifti2Image, n_col: int):
     for i in range(16):
         try:
             ax = hdr.get_axis(i)
-        except Exception:
+        except (IndexError, ValueError):
             continue
         size = getattr(ax, "size", None)
         if size == n_col and hasattr(ax, "vertex") and hasattr(ax, "name"):
@@ -62,17 +52,12 @@ def load_dtseries_vertex_timeseries(
     if raw.ndim != 2:
         raise ValueError(f"Expected 2D data in {path}, got shape {raw.shape}")
 
-    if raw.shape[0] <= raw.shape[1]:
-        series = raw
-    else:
-        series = raw.T
+    series = raw if raw.shape[0] <= raw.shape[1] else raw.T
     n_tr, n_g = series.shape
 
     bm = _find_brain_model_axis(img, n_g)
     if bm is None:
-        raise RuntimeError(
-            f"Could not find BrainModelAxis with size {n_g} in {path}"
-        )
+        raise RuntimeError(f"Could not find BrainModelAxis with size {n_g} in {path}")
 
     names = np.asarray(bm.name)
     verts = np.asarray(bm.vertex, dtype=np.int64)
@@ -258,7 +243,7 @@ def main() -> None:
     ap.add_argument(
         "--dtseries-root",
         type=Path,
-        default=Path("data/raw/hcp_rest_dtseries"),
+        default=Path("<path>"),
         help="Root folder to search for *.dtseries.nii.",
     )
     ap.add_argument(
@@ -270,13 +255,13 @@ def main() -> None:
     ap.add_argument(
         "--filestore",
         type=Path,
-        default=Path("filestore"),
+        default=Path("<path>"),
         help="PyCortex filestore (same as GIFTI renderer)",
     )
     ap.add_argument(
         "--out-dir",
         type=Path,
-        default=Path("outputs/flatmaps_hcp"),
+        default=Path("<path>"),
         help="Output root: <out-dir>/<tag>/frame_XXXXXX.png",
     )
     ap.add_argument("--pycortex-subject", default="HCP_S1200_32k")
@@ -449,7 +434,7 @@ def main() -> None:
         for fp in paths:
             try:
                 data = load_dtseries_vertex_timeseries(fp, n_lh=n_lh, n_rh=n_rh)
-            except Exception as e:
+            except (OSError, RuntimeError, ValueError) as e:
                 print(f"Skip scale-prepass {fp}: {e}", file=sys.stderr)
                 continue
 
@@ -463,13 +448,14 @@ def main() -> None:
                 samples.append(s)
 
         if not samples:
-            print("Could not compute all-files scale: no finite sampled values.", file=sys.stderr)
+            print(
+                "Could not compute all-files scale: no finite sampled values.",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
         pooled = np.concatenate(samples, axis=0)
-        shared_vmin, shared_vmax = _percentile_limits_from_values(
-            pooled, args.pct_low, args.pct_high
-        )
+        shared_vmin, shared_vmax = _percentile_limits_from_values(pooled, args.pct_low, args.pct_high)
         print(
             f"Using shared all-files color scale: vmin={shared_vmin:.6f} vmax={shared_vmax:.6f} "
             f"(samples={pooled.size}, files={len(samples)})"
@@ -489,7 +475,7 @@ def main() -> None:
         tag = _output_tag_from_stem(fp.stem.replace(".dtseries", ""))
         try:
             data = load_dtseries_vertex_timeseries(fp, n_lh=n_lh, n_rh=n_rh)
-        except Exception as e:
+        except (OSError, RuntimeError, ValueError) as e:
             print(f"Skip {fp}: {e}", file=sys.stderr)
             continue
 
@@ -509,20 +495,11 @@ def main() -> None:
         file_vmin = file_vmax = None
         if shared_vmin is not None and shared_vmax is not None:
             file_vmin, file_vmax = shared_vmin, shared_vmax
-        elif args.scale_mode == "per-file":
-            file_vmin, file_vmax = _percentile_limits_from_values(
-                seg[np.isfinite(seg)], args.pct_low, args.pct_high
-            )
-        elif args.scale_mode == "legacy" and args.norm_mode != "framewise":
-            file_vmin, file_vmax = _percentile_limits_from_values(
-                seg[np.isfinite(seg)], args.pct_low, args.pct_high
-            )
+        elif args.scale_mode == "per-file" or (args.scale_mode == "legacy" and args.norm_mode != "framewise"):
+            file_vmin, file_vmax = _percentile_limits_from_values(seg[np.isfinite(seg)], args.pct_low, args.pct_high)
 
         if file_vmin is not None and file_vmax is not None:
-            print(
-                f"Color scale for {fp.name}: vmin={file_vmin:.6f} vmax={file_vmax:.6f} "
-                f"(mode={args.scale_mode})"
-            )
+            print(f"Color scale for {fp.name}: vmin={file_vmin:.6f} vmax={file_vmax:.6f} (mode={args.scale_mode})")
 
         for t in range(t0, t1):
             vec = np.asarray(seg[:, t - t0], dtype=float)

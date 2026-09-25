@@ -13,12 +13,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
-
-OUT_BASE = Path("outputs/cache")
-LABEL_DIR = OUT_BASE / "coco80_labels"
-STIM_INFO = Path("data/nsd_stim_info_merged.csv")
-RESULTS_DIR = Path("outputs/results")
-CKPT_DIR = Path("outputs/checkpoints")
+OUT_BASE = Path("<path>")
+LABEL_DIR = Path("<path>")
+STIM_INFO = Path("<path>")
+RESULTS_DIR = Path("<path>")
+CKPT_DIR = Path("<path>")
 SUBJECTS = ("sub1", "sub2", "sub5", "sub7")
 SUBJECT_COL = {
     "sub1": "subject1",
@@ -107,7 +106,7 @@ class TokenDataset(Dataset):
         self.nsd_ids = nsd_ids.astype(np.int64, copy=False)
 
     def __len__(self) -> int:
-        return int(len(self.nsd_ids))
+        return len(self.nsd_ids)
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         return (
@@ -132,10 +131,17 @@ class ResidualBlock(nn.Module):
 
 
 class DinoTokenClassifier(nn.Module):
-    def __init__(self, token_mode: str, hidden_dim: int = 1024, depth: int = 3, dropout: float = 0.1, out_dim: int = 80):
+    def __init__(
+        self,
+        token_mode: str,
+        hidden_dim: int = 1024,
+        depth: int = 3,
+        dropout: float = 0.1,
+        out_dim: int = 80,
+    ):
         super().__init__()
         self.token_mode = token_mode
-        in_dim = 768 if token_mode == "last" else 768 * 3
+        in_dim = 768 if token_mode == "last" else 768 * 3  # noqa: S105 - model token mode
         self.stem = nn.Sequential(
             nn.Linear(in_dim, hidden_dim),
             nn.LayerNorm(hidden_dim),
@@ -146,7 +152,7 @@ class DinoTokenClassifier(nn.Module):
         self.head = nn.Linear(hidden_dim, out_dim)
 
     def encode_tokens(self, x: torch.Tensor) -> torch.Tensor:
-        if self.token_mode == "last":
+        if self.token_mode == "last":  # noqa: S105 - model token mode
             return x[:, -1, :]
         cls = x[:, 0, :]
         patches = x[:, 1:, :]
@@ -272,10 +278,11 @@ def build_split(
     token_index = {int(nsd_id): idx for idx, nsd_id in enumerate(token_ids.tolist())}
     label_index = {int(nsd_id): idx for idx, nsd_id in enumerate(label_ids.tolist())}
 
-    if args.regime == "within":
-        train_subjects = [args.test_subject]
-    else:
-        train_subjects = [s for s in SUBJECTS if s != args.test_subject]
+    train_subjects = (
+        [args.test_subject]
+        if args.regime == "within"
+        else [subject for subject in SUBJECTS if subject != args.test_subject]
+    )
 
     train_pool: set[int] = set()
     for subject in train_subjects:
@@ -297,7 +304,7 @@ def build_split(
     rng = np.random.default_rng(args.seed)
     perm = np.arange(len(train_ids_all))
     rng.shuffle(perm)
-    n_val = max(1, int(round(len(perm) * args.val_frac))) if len(perm) > 1 else 0
+    n_val = max(1, round(len(perm) * args.val_frac)) if len(perm) > 1 else 0
     n_val = min(n_val, max(0, len(perm) - 1))
     val_sel = perm[:n_val]
     train_sel = perm[n_val:]
@@ -384,7 +391,9 @@ def main() -> None:
     neg = float(len(train_y)) - pos
     pos_weight = torch.clamp(neg / torch.clamp(pos, min=1.0), min=1.0, max=50.0).to(device)
 
-    tag = f"nsd_image_dino_coco80_{args.target_name}_{args.token_mode}_{args.regime}_{args.test_subject}_seed{args.seed}"
+    tag = (
+        f"nsd_image_dino_coco80_{args.target_name}_{args.token_mode}_{args.regime}_{args.test_subject}_seed{args.seed}"
+    )
     out = args.out or (RESULTS_DIR / f"{tag}.json")
     ckpt = args.ckpt or (CKPT_DIR / f"{tag}.pt")
     n_params = sum(p.numel() for p in model.parameters())
@@ -422,7 +431,10 @@ def main() -> None:
             running += float(loss.item()) * b
             seen += b
             if args.log_every > 0 and step % args.log_every == 0:
-                print(f"[train] epoch={epoch} step={step}/{len(train_loader)} loss={running / max(seen,1):.6f}", flush=True)
+                print(
+                    f"[train] epoch={epoch} step={step}/{len(train_loader)} loss={running / max(seen, 1):.6f}",
+                    flush=True,
+                )
         train_loss = running / max(seen, 1)
         val_metrics, _, _, _ = evaluate_classifier(model, val_loader, device, amp)
         history.append(
@@ -443,7 +455,8 @@ def main() -> None:
             best_val = current
             best_state = {k: v.detach().cpu() for k, v in model.state_dict().items()}
 
-    assert best_state is not None
+    if best_state is None:
+        raise RuntimeError("Training completed without a valid checkpoint.")
     model.load_state_dict(best_state)
     test_metrics, _, _, pred_ids = evaluate_classifier(model, test_loader, device, amp)
     payload = {
@@ -455,9 +468,9 @@ def main() -> None:
         "train_subjects": train_subjects,
         "config": vars(args),
         "params": int(n_params),
-        "n_train": int(len(train_ds)),
-        "n_val": int(len(val_ds)),
-        "n_test_shared1000": int(len(test_ds)),
+        "n_train": len(train_ds),
+        "n_val": len(val_ds),
+        "n_test_shared1000": len(test_ds),
         "best_val_metric": float(best_val),
         "history": history,
         "test_metrics": test_metrics,

@@ -1,29 +1,17 @@
 #!/usr/bin/env python
-"""Build subject-specific NSD general ROI masks on fsLR 32k surfaces.
-
-The official NSD data include subject-native FreeSurfer surface labels:
-
-    nsddata/freesurfer/subjXX/label/{lh,rh}.nsdgeneral.mgz
-
-This script samples those native-surface labels onto fsaverage 164k with the
-NSD-provided `white-to-fsaverage.mgz` lookup, then downsamples fsaverage 164k
-to fsLR 32k by nearest-neighbour lookup on the fsaverage-registered spheres
-distributed with neuromaps.
-"""
 
 from __future__ import annotations
 
 import argparse
 import json
 import shutil
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable
 
 import nibabel as nib
 import numpy as np
 from scipy.spatial import cKDTree
-
 
 HEMIS = {
     "lh": {"key": "left", "atlas": "L"},
@@ -127,10 +115,7 @@ def build_subject_mask(
         native = load_label(source_label)
         fsavg_to_native = np.asanyarray(nib.load(str(transform)).dataobj).reshape(-1).astype(np.int64) - 1
         if fsavg_to_native.min() < 0 or fsavg_to_native.max() >= native.shape[0]:
-            raise ValueError(
-                f"{transform} contains indices outside native label range "
-                f"0..{native.shape[0] - 1}"
-            )
+            raise ValueError(f"{transform} contains indices outside native label range 0..{native.shape[0] - 1}")
 
         fsaverage = native[fsavg_to_native]
         fslr = fsaverage[lookups[hemi]] & fslr_medial[hemi]
@@ -154,7 +139,7 @@ def build_subject_mask(
 
     output_npz = outdir / f"{subject}_nsdgeneral_fsLR32k.npz"
     np.savez_compressed(output_npz, **arrays)
-    return SubjectSummary(subject=subject, output_npz=str(output_npz), hemispheres=summaries)
+    return SubjectSummary(subject=subject, output_npz=output_npz.name, hemispheres=summaries)
 
 
 def main() -> None:
@@ -162,13 +147,13 @@ def main() -> None:
     parser.add_argument(
         "--nsddata",
         type=Path,
-        default=Path("data/nsd/nsddata"),
+        default=Path("<path>"),
         help="Path to the NSD nsddata directory.",
     )
     parser.add_argument(
         "--outdir",
         type=Path,
-        default=Path("outputs/nsdgeneral_fslr32k_masks"),
+        default=Path("<path>"),
         help="Directory for generated subject .npz files and manifest.",
     )
     parser.add_argument(
@@ -198,8 +183,8 @@ def main() -> None:
     for hemi, spec in HEMIS.items():
         atlas_hemi = spec["atlas"]
         src_sphere = Path(getattr(fsaverage.sphere, atlas_hemi))
-        trg_sphere = src_sphere.parent.parent / "fsLR" / (
-            f"tpl-fsLR_space-fsaverage_den-32k_hemi-{atlas_hemi}_sphere.surf.gii"
+        trg_sphere = (
+            src_sphere.parent.parent / "fsLR" / (f"tpl-fsLR_space-fsaverage_den-32k_hemi-{atlas_hemi}_sphere.surf.gii")
         )
         if not trg_sphere.exists():
             trg_sphere = Path(getattr(fslr.sphere, atlas_hemi))
@@ -217,13 +202,10 @@ def main() -> None:
         rh=lookups["rh"],
     )
 
-    summaries = [
-        build_subject_mask(nsddata, subject, outdir, lookups, fslr_medial)
-        for subject in subjects
-    ]
+    summaries = [build_subject_mask(nsddata, subject, outdir, lookups, fslr_medial) for subject in subjects]
 
     manifest = {
-        "nsddata": str(nsddata),
+        "nsddata": nsddata.name,
         "subjects": subjects,
         "method": (
             "official subject-native FreeSurfer nsdgeneral surface labels -> "
@@ -231,8 +213,8 @@ def main() -> None:
             "from fsaverage 164k to fsLR 32k"
         ),
         "workbench_available": shutil.which("wb_command") is not None,
-        "atlas_paths": lookup_paths,
-        "lookup_npz": str(outdir / "fsaverage164k_to_fslr32k_nearest_lookup.npz"),
+        "atlas_paths": {key: Path(value).name for key, value in lookup_paths.items()},
+        "lookup_npz": "fsaverage164k_to_fslr32k_nearest_lookup.npz",
         "outputs": [
             {
                 "subject": summary.subject,
@@ -249,8 +231,7 @@ def main() -> None:
     print(f"Wrote {manifest_path}")
     for summary in summaries:
         counts = ", ".join(
-            f"{hemi.hemi}:{hemi.fslr_positive_vertices}/{hemi.fslr_vertices}"
-            for hemi in summary.hemispheres
+            f"{hemi.hemi}:{hemi.fslr_positive_vertices}/{hemi.fslr_vertices}" for hemi in summary.hemispheres
         )
         print(f"{summary.subject}: {summary.output_npz} ({counts})")
 

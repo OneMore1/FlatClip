@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 import inspect
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 import torch
 from PIL import Image
 from transformers import AutoImageProcessor, AutoModel, AutoTokenizer
 
-
-CHECKPOINT_ROOT = Path(os.environ.get("FLATCLIP_CHECKPOINT_ROOT", "checkpoints")).expanduser()
+CHECKPOINT_ROOT = Path(os.environ.get("FLATCLIP_CHECKPOINT_ROOT", "<path>")).expanduser()
 CHECKPOINT_MAP = {
-    "base": CHECKPOINT_ROOT / "siglip2-base-patch16-224",
-    "naflex": CHECKPOINT_ROOT / "siglip2-base-patch16-naflex",
-    "so400m": CHECKPOINT_ROOT / "siglip2-so400m-patch14-384",
-    "large": CHECKPOINT_ROOT / "siglip2-large-patch16-384",
+    "base": CHECKPOINT_ROOT,
+    "naflex": CHECKPOINT_ROOT,
+    "so400m": CHECKPOINT_ROOT,
+    "large": CHECKPOINT_ROOT,
 }
 IMAGE_SIZE_MAP = {
     "base": 224,
@@ -59,7 +58,11 @@ def move_to_device(inputs: dict[str, object], device: str | torch.device) -> dic
     return {key: value.to(device) if torch.is_tensor(value) else value for key, value in inputs.items()}
 
 
-def preprocess_images(bundle: SigLIP2Bundle, images: Image.Image | list[Image.Image], device: str | torch.device | None = None) -> dict[str, object]:
+def preprocess_images(
+    bundle: SigLIP2Bundle,
+    images: Image.Image | list[Image.Image],
+    device: str | torch.device | None = None,
+) -> dict[str, object]:
     inputs = dict(bundle.image_processor(images=images, return_tensors="pt"))
     if device is not None:
         inputs = move_to_device(inputs, device)
@@ -76,7 +79,11 @@ def _call_with_supported_kwargs(fn: object, kwargs: dict[str, object]) -> object
     return fn(**supported)
 
 
-def extract_features(bundle: SigLIP2Bundle, pixel_values: torch.Tensor | None = None, **image_inputs: object) -> dict[str, torch.Tensor]:
+def extract_features(
+    bundle: SigLIP2Bundle,
+    pixel_values: torch.Tensor | None = None,
+    **image_inputs: object,
+) -> dict[str, torch.Tensor]:
     if pixel_values is not None:
         image_inputs["pixel_values"] = pixel_values
     if "pixel_values" not in image_inputs:
