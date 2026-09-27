@@ -1,20 +1,8 @@
 <div align="center">
 
-# FlatClip
+# [NeurIPS 2026] FlatClip: A Geometry-Aware Surface-Level Baseline for fMRI Representation Learning
 
-### A Geometry-Aware Surface-Level Baseline for fMRI Representation Learning
 
-**NeurIPS 2026**
-
-[Mo Wang](https://openreview.net/profile?id=~Mo_Wang4),
-[Wenhao Ye](https://openreview.net/profile?id=~Wenhao_Ye3),
-[Zihan Ning](https://openreview.net/profile?id=~Zihan_Ning1),
-[Jiayu Zuo](https://openreview.net/profile?id=~Jiayu_Zuo1),
-[Junfeng Xia](https://openreview.net/profile?id=~Junfeng_Xia2),
-[Hongkai Wen](https://openreview.net/profile?id=~Hongkai_Wen1)<sup>*</sup>,
-[Quanying Liu](https://openreview.net/profile?id=~Quanying_Liu1)<sup>*</sup>
-
-Southern University of Science and Technology · University of Warwick · Shenzhen University
 
 [Image Encoder](https://huggingface.co/google/siglip2-base-patch16-naflex) ·
 [Quick Start](#quick-start) ·
@@ -64,8 +52,7 @@ inputs, or paired cortical response arrays for NSD.
 
 ### 2. Download the image encoder
 
-FlatClip reuses Google's image-pretrained weights. **There is no separate FlatClip
-encoder checkpoint to download**, and no model weights are stored in this repository.
+FlatClip reuses Google's image-pretrained weights.
 
 | Backbone | Official model / download | Use |
 |---|---|---|
@@ -257,27 +244,17 @@ FlatClip/
   requirements.txt
 ```
 
-This repository contains the main pipeline. Ablation runners, subject data,
-feature caches, and trained weights are not included.
 
 ## Citation
 
 ```bibtex
-@inproceedings{wang2026flatclip,
-  title={FlatClip: A Geometry-Aware Surface-Level Baseline for fMRI Representation Learning},
-  author={Wang, Mo and Ye, Wenhao and Ning, Zihan and Zuo, Jiayu and Xia, Junfeng and Wen, Hongkai and Liu, Quanying},
-  booktitle={Advances in Neural Information Processing Systems},
-  year={2026}
+@inproceedings{
+anonymous2026flatclip,
+title={FlatClip: Reusing Image Foundation Models for f{MRI} Representation Learning via Cortical Flatmaps},
+author={Anonymous},
+booktitle={The Fortieth Annual Conference on Neural Information Processing Systems},
+year={2026},
+url={https://openreview.net/forum?id=W9QQrE5T3h}
 }
 ```
 
-## Acknowledgements
-
-FlatClip builds on [SigLIP2](https://huggingface.co/google/siglip2-base-patch16-naflex),
-[Pycortex](https://gallantlab.org/pycortex/), and
-[neuromaps](https://netneurolab.github.io/neuromaps/).
-Please follow the original model licenses and dataset access agreements.
-
-<sup>*</sup> Correspondence:
-[Hongkai Wen](mailto:hongkai.wen@warwick.ac.uk) and
-[Quanying Liu](mailto:liuqy@sustech.edu.cn).
