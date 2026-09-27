@@ -32,3 +32,5 @@ logs/
 *.svg
 *.pdf
 
+# Public README figure.
+!docs/assets/figure3.png
