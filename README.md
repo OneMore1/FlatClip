@@ -21,7 +21,7 @@ without fMRI-specific encoder pretraining.
   <img src="docs/assets/figure3.png" width="100%" alt="Figure 3: whole-cortex, visual-cortex, and NSDgeneral flatmaps, with subject-wise and aggregate NSD COCO80 decoding results." />
 </p>
 
-**Figure 3.** Visual-fMRI recognition on NSD: cortical input regions, subject-wise
+ Visual-fMRI recognition on NSD: cortical input regions, subject-wise
 mAP, and mean mAP / weighted F1 across four subjects.
 
 | Stage | Input | Output |
@@ -29,6 +29,9 @@ mAP, and mean mAP / weighted F1 across four subjects.
 | Surface rendering | Cortical fMRI time series or stimulus-response maps | RGB flatmap images |
 | Frozen image encoding | Flatmap images | SigLIP2 frame or stimulus features |
 | Downstream readout | Cached features and task labels | Subject-level or COCO80 predictions |
+
+
+🚀 Welcome to our gallery **fMRI_atlas** for more models and dataset collections www.fmriatlas.com.
 
 ## Quick Start
 
