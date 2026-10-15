@@ -1,6 +1,6 @@
 <div align="center">
 
-# [NeurIPS 2026] FlatClip: A Geometry-Aware Surface-Level Baseline for fMRI Representation Learning
+# [NeurIPS 2026] FlatClip: Reusing Image Foundation Models for fMRI Representation Learning via Cortical Flatmaps
 
 
 
