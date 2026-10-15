@@ -251,13 +251,11 @@ FlatClip/
 ## Citation
 
 ```bibtex
-@inproceedings{
-anonymous2026flatclip,
-title={FlatClip: Reusing Image Foundation Models for f{MRI} Representation Learning via Cortical Flatmaps},
-author={Anonymous},
-booktitle={The Fortieth Annual Conference on Neural Information Processing Systems},
-year={2026},
-url={https://openreview.net/forum?id=W9QQrE5T3h}
+@article{wang2026flatclip,
+  title={FlatClip: A Geometry-Aware Surface-Level Baseline for fMRI Representation Learning},
+  author={Wang, Mo and Ye, Wenhao and Ning, Zihan and Zuo, Jiayu and Xia, Junfeng and Wen, Hongkai and Liu, Quanying},
+  journal={arXiv preprint arXiv:2609.31204},
+  year={2026}
 }
 ```
 
